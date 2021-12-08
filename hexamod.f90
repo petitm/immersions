@@ -6,6 +6,8 @@ module hexamod
       public subeffbdy
       public convexe, concave1, concave2, concave3, concave4, orienttocurve
       public singutest, orienttobrick, cornerPA, findPA, sizempm, numbermpm
+      public loopsizempm, loopnbmpm
+      public integerPA
 
 contains
 
@@ -459,11 +461,19 @@ contains
                         if (any(interset == bdy(poscorner(n))) .or. &
                             any(interset == bdy(modulo(poscorner(n)+2, perim+1))) .or. &
                             any(interset == bdy(poscorner(m))) .or. &
-                            any(interset == bdy(modulo(poscorner(n)+2, perim+1)))) then
+                            any(interset == bdy(modulo(poscorner(m)+2, perim+1)))) then
 
                               cond = .false.
 
                         end if
+
+                        !print*, 'interset', interset
+                        !print*, 'n,m', n,m
+                        !print*, 'bdy(poscorner(n))', bdy(poscorner(n))
+                        !print*, 'bdy(modulo(poscorner(n)+2, perim+1))', bdy(modulo(poscorner(n)+2, perim+1))
+                        !print*, 'bdy(poscorner(m))',bdy(poscorner(m))
+                        !print*, 'bdy(modulo(poscorner(m)+2, perim+1)))', bdy(modulo(poscorner(m)+2, perim+1))
+
 
                         deallocate(interset)
 
@@ -573,6 +583,143 @@ contains
 
       end subroutine numbermpm
 
+      subroutine loopsizempm(PA, taille, w, sizeStot)
+
+            implicit none
+            integer, intent(in) :: taille
+            complex, intent(in) :: PA(:)
+            !integer, intent(out) :: sizeS
+            integer, intent(out), allocatable :: sizeStot(:,:), w(:,:)
+
+            integer :: i, j, next, v, val          
+
+            allocate(w(taille,taille))
+            allocate(sizeStot(taille,taille))
+
+            w(:,:)=0
+
+            do i=1,taille
+                  do j=i+1, taille
+                        if (any(PA == cmplx(i,j))) then
+                              w(i,j)=1
+                        end if
+                  end do 
+            end do
+
+            ! do i=1,taille
+            !       print*, 'w', w(i,:)
+            !   end do
+
+            sizeStot(:,:)=0
+
+            do i=1,taille-1
+
+                  if (w(i,i+1)==1) then
+                        sizeStot(i,i+1)=1
+                  end if
+
+            end do 
+
+            do i=1,taille-2
+
+                  sizeStot(i,i+2)=max(w(i,i+2),w(i+1,i+2),w(i,i+1))
+
+            end do 
+
+            do i=1,taille-3
+
+                  sizeStot(i,i+3)=max(sizeStot(i+1,i+3),sizeStot(i,i+2),w(i,i+3)+sizeStot(i+1,i+2),w(i,i+1)+sizeStot(i+2,i+3))
+
+            end do 
+
+            do next=4,taille-1
+                  do i=1, taille-next
+                        sizeStot(i,i+next)=0
+                        do v=i+1,i+next
+
+                              if (w(i,v)==0) then 
+                                    val=0
+                              else 
+                                    val=1+sizeStot(i+1,max(i+1,v-1))+sizeStot(min(i+next,v+1),i+next)
+                              end if 
+                              
+                              sizeStot(i,i+next)=max(sizeStot(i,i+next),sizeStot(i+1,i+next),val)
+                        end do
+                  end do 
+            end do
+
+      end subroutine
+
+      subroutine loopnbmpm(PA, taille, w, sizeStot, nbmpm)
+
+            implicit none
+            integer, intent(in) :: taille
+            complex, intent(in) :: PA(:)
+            integer, intent(in) :: sizeStot(:,:), w(:,:)
+            integer, intent(out), allocatable :: nbmpm(:,:)
+
+            integer :: i, j, next, v
+
+            allocate(nbmpm(taille,taille))
+
+            do i=1,taille
+                  do j=i,taille
+                        nbmpm(j,i)=1
+                  end do 
+            end do
+
+            do i=1,taille-1
+                  ! if (w(i,i+1)==1) then 
+                  !       nbmpm(i,i+1)=1
+                  ! else 
+                  !       nbmpm(i,i+1)=0
+                  ! end if 
+                  nbmpm(i,i+1)=1
+            end do 
+
+            do next=2,taille-1
+                  do i=1,taille-next
+
+                        if (sizeStot(i,i+next)==sizeStot(i+1,i+next)) then 
+                              nbmpm(i,i+next)=nbmpm(i+1,i+next)
+                        else 
+                              nbmpm(i,i+next)=0
+                        end if
+
+                        do v=i+1,i+next
+                              if (w(i,v)==1.and.sizeStot(i,i+next)==1+sizeStot(i+1,max(i+1,v-1))+sizeStot(min(i+next,v+1),i+next)) &
+                              then 
+                              
+                                    nbmpm(i,i+next)=nbmpm(i,i+next)+nbmpm(i+1,max(i+1,v-1))*nbmpm(min(v+1,i+next),i+next)
+                              
+                              end if 
+                        end do
+                  end do
+            end do
+
+      end subroutine
+
+      subroutine integerPA(PA, taille, intPA)
+
+            implicit none
+            integer, intent(in) :: taille
+            complex, intent(in) :: PA(:)
+            integer, intent(out), allocatable :: intPA(:,:)
+
+            integer :: i, sizePA
+
+            sizePA = size(PA(:))
+
+            !print*, sizePA
+
+            allocate(intPA(sizePA,2))
+
+            do i=1,sizePA
+                  intPA(i,1)=int(realpart(PA(i)))
+                  intPA(i,2)=int(imagpart(PA(i)))
+            end do
+
+      end subroutine
 
 
 end module hexamod
